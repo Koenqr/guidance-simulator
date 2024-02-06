@@ -109,3 +109,26 @@ ax2.axvline(min_range*dt, color='green', linestyle='--', label='t final')
 fig2.legend()
 
 plt.show()
+
+#animation of 3D plot
+import matplotlib.animation as ani
+
+fig4 = plt.figure()
+ax4 = fig4.add_subplot(111, projection='3d')
+
+def update_lines(num, Tlist, Mlist, line1, line2):
+    line1.set_data(Tlist[:num, 0], Tlist[:num, 1])
+    line1.set_3d_properties(Tlist[:num, 2])
+    line2.set_data(Mlist[:num, 0], Mlist[:num, 1])
+    line2.set_3d_properties(Mlist[:num, 2])
+    return line1, line2
+
+line1, = ax4.plot([], [], [], label='Target')
+
+line2, = ax4.plot([], [], [], label='Missile')
+
+ax4.legend()
+
+ani3d = ani.FuncAnimation(fig4, update_lines, len(Tlist), fargs=(Tlist, Mlist, line1, line2), interval=1000*dt, blit=True)
+
+plt.show()
