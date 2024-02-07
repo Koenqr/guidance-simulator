@@ -11,10 +11,10 @@ def norm(x):
 # Setting initial conditions
 dt = 0.01  # time step
 tmax = 30  # simulation time
-glim = 3  # maximum acceleration
+glim = 50  # maximum acceleration
 
 T = np.array([0, 0, 0])  # target position
-M = np.array([-10000, 0, 0])  # missile position
+M = np.array([-5000, 0, 0])  # missile position
 
 Vt = np.array([0, 300, 0])  # target velocity
 Vm = np.array([600, 0, 0])  # missile velocity
@@ -120,21 +120,30 @@ plt.show()
 
 
 
-
 #make animation of the 3d engagement
-import matplotlib.animation as ani
+import matplotlib.animation as animation
 
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
+fig=plt.figure()
+ax=fig.add_subplot(111, projection='3d')
 
-Tlist = np.array(Tlist)
-Mlist = np.array(Mlist)
+Mline, = ax.plot([],[],[], label='Missile')
+Tline, = ax.plot([],[],[], label='Target')
+ax.set(xlim=(-5000, 1000), ylim=(-5000, 5000), zlim=(-1000, 1000))
 
-def update(i):
-    ax.plot(Tlist[i, 0], Tlist[i, 1], Tlist[i, 2], label='Target')
-    ax.plot(Mlist[i, 0], Mlist[i, 1], Mlist[i, 2], label='Missile')
-    ax.legend()
-    
-ani = ani.FuncAnimation(fig, update, frames=len(Tlist), repeat=True)
+def init():
+    Mline.set_data([], [])
+    Mline.set_3d_properties([])
+    Tline.set_data([], [])
+    Tline.set_3d_properties([])
+    return Mline, Tline
+
+def animate(i,Mline,Tline):
+    Mline.set_data(Mlist[:i,0], Mlist[:i,1])
+    Mline.set_3d_properties(Mlist[:i,2])
+    Tline.set_data(Tlist[:i,0], Tlist[:i,1])
+    Tline.set_3d_properties(Tlist[:i,2])
+    return Mline, Tline
+
+anim=animation.FuncAnimation(fig, animate, init_func=init, frames=len(Tlist), fargs=(Mline,Tline), interval=1, blit=True)
 
 plt.show()
