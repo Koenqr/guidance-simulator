@@ -16,6 +16,8 @@ dt = 0.01  # time step
 tmax = 25  # simulation time
 glim = 20  # maximum acceleration
 
+mass = 175  # missile mass
+
 T = np.array([0, 0, 10000])  # target position
 M = np.array([-10000, 0, 10000])  # missile position
 
@@ -26,7 +28,6 @@ def At(t):  # target acceleration
     return np.array([0, 0, np.cos(t)*30])
 
 def Am(T, M, Vt, Vm, t):
-    # Proportional navigation guidance law, simplified to avoid overflow
     N = 3
     R = T - M  # Relative position vector from missile to target
     Vr = Vt - Vm  # Relative velocity vector between target and missile
@@ -46,7 +47,7 @@ def Am(T, M, Vt, Vm, t):
     
     accel = N*zemi/tgo**2
     
-    accel = accel + N*reject(At(t),norm(R))/-2 #APN
+    accel = accel + N*reject(At(t),norm(R))/2 #APN
     
     accel = reject(accel, norm(Vm)) #control surface
     
@@ -55,10 +56,10 @@ def Am(T, M, Vt, Vm, t):
     if la.norm(accel) > glim*9.81:
         return glim * norm(accel)
     
-    return accel-la.norm(accel)*norm(Vm)*0.01
+    return accel-(la.norm(accel)**2*norm(Vm)*0.5)/mass
 
-def quadraticDrag(V, rho=1.2, Cd=0.007, A=0.125):
-    return -0.5 * rho * Cd * A * la.norm(V) * V
+def quadraticDrag(V, rho=1.2, Cd=0.5, A=0.125):
+    return (-0.5 * rho * Cd * A * la.norm(V) * V)/mass
 
 def getrho(h,p0=101325, T0=288.15, L=0.00976, R=8.31447, M=0.0289644, g=9.81, Rs=287):
     return (p0*(1-L*h/T0)**(g*M/(R*L)))/(Rs*T0)
@@ -137,7 +138,7 @@ ax3.plot(timelist, [la.norm(ZEM) for ZEM in ZEMlist], label='ZEM', color='red')
 ax3.set_ylabel('ZEM (meters)')
 
 #velocity plot
-ax3.plot(timelist, [la.norm(Vm) for Vm in Vmlist], label='Vm', color='yellow')
+ax2.plot(timelist, [la.norm(Vm)/343 for Vm in Vmlist], label='Vm', color='yellow')
 
 #add  vertical line to show the time when the missile is closest to the target
 ax2.axvline(min_range*dt, color='green', linestyle='--', label='t final')
@@ -160,7 +161,7 @@ ax=fig.add_subplot(111, projection='3d')
 
 Mline, = ax.plot([],[],[], label='Missile')
 Tline, = ax.plot([],[],[], label='Target')
-ax.set(xlim=(-5000, 1000), ylim=(0, 5000), zlim=(9000, 11000))
+ax.set(xlim=(-5000, 1000), ylim=(0, 5000), zlim=(9500, 10500))
 
 def init():
     Mline.set_data([], [])
