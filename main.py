@@ -8,16 +8,19 @@ from mpl_toolkits.mplot3d import Axes3D
 def norm(x):
 	return x/la.norm(x)
 
+def reject(v, n):
+    return v - np.dot(v,n)*n
+
 # Setting initial conditions
 dt = 0.01  # time step
-tmax = 30  # simulation time
-glim = 50  # maximum acceleration
+tmax = 25  # simulation time
+glim = 20  # maximum acceleration
 
-T = np.array([0, 0, 0])  # target position
-M = np.array([-5000, 0, 0])  # missile position
+T = np.array([0, 0, 10000])  # target position
+M = np.array([-10000, 0, 10000])  # missile position
 
 Vt = np.array([0, 300, 0])  # target velocity
-Vm = np.array([600, 0, 0])  # missile velocity
+Vm = np.array([343*5, 0, 0])  # missile velocity
 
 def At(t):  # target acceleration
     return np.array([0, 0, np.cos(t/3)*30])
@@ -35,27 +38,44 @@ def Am(T, M, Vt, Vm, t):
     # Compute LOS rate as the rate of change of the line of sight angle
     LOS_rate = np.cross(R, Vr) / la.norm(R)**2
     
-    # Calculate acceleration using proportional navigation guidance law
-    # Assuming the missile acceleration is proportional to the LOS rate and the magnitude of the relative velocity
     accel = N * la.norm(Vr) * np.cross(norm(Vm),LOS_rate)
+    
+    accel = accel + N*reject(At(t),norm(R))/-2 #APN
+    
+    accel = reject(accel, norm(Vm)) #control surface
     
     #bound the acceleration to avoid overflow
     
-    accel = np.clip(accel, -glim*9.8, glim*9.8)
+    if la.norm(accel) > glim*9.81:
+        return glim * norm(accel)
     
     return accel
+
+def quadraticDrag(V, rho=1.2, Cd=0.007, A=0.125):
+    return -0.5 * rho * Cd * A * la.norm(V) * V
+
+def getrho(h,p0=101325, T0=288.15, L=0.00976, R=8.31447, M=0.0289644, g=9.81, Rs=287):
+    return (p0*(1-L*h/T0)**(g*M/(R*L)))/(Rs*T0)
+
+timelist = []
 
 
 Tlist = []
 Mlist = []
+
+Vmlist = []
 
 TGOlist = []
 ZEMlist = []
 
 t = 0
 while t < tmax:
+    timelist.append(t)
+    
     Tlist.append(T)
     Mlist.append(M)
+    
+    Vmlist.append(Vm)
     
     TGOlist.append(la.norm(T-M)/la.norm(Vt-Vm))
     ZEMlist.append((Vt-Vm)*(la.norm(T-M)/la.norm(Vt-Vm)))
@@ -65,8 +85,11 @@ while t < tmax:
     T = T + Vt * dt
 
     # Update missile and target velocities
-    Vm = Vm + Am(T, M, Vt, Vm, t) * dt
+    Vm = Vm + Am(T, M, Vt, Vm, t) * dt + quadraticDrag(Vm, rho=getrho(M[2])) * dt
     Vt = Vt + At(t) * dt
+    
+    if np.dot(Vm,T-M)<0:
+        break
 
     # Update time
     t += dt
@@ -96,7 +119,7 @@ ax.legend()
 fig2 = plt.figure()
 ax2 = fig2.add_subplot() #dual axis plot TGO and ZEM
 
-ax2.plot(np.arange(0, tmax, dt), TGOlist, label='TGO-est', color='blue')
+ax2.plot(timelist, TGOlist, label='TGO-est', color='blue')
 #actual tgo (line with -45 deg slope until the missile is closest to the target)
 ax2.plot(np.arange(0, min_range*dt, dt), np.arange(min_range*dt, 0, -dt), label='TGO-actual', color='cyan')
 
@@ -104,15 +127,18 @@ ax2.set_ylabel('TGO (seconds)')
 ax2.set_xlabel('Time (seconds)')
 
 ax3 = ax2.twinx()
-ax3.plot(np.arange(0, tmax, dt), [la.norm(ZEM) for ZEM in ZEMlist], label='ZEM', color='red')
+ax3.plot(timelist, [la.norm(ZEM) for ZEM in ZEMlist], label='ZEM', color='red')
 ax3.set_ylabel('ZEM (meters)')
+
+#velocity plot
+ax3.plot(timelist, [la.norm(Vm) for Vm in Vmlist], label='Vm', color='yellow')
 
 #add  vertical line to show the time when the missile is closest to the target
 ax2.axvline(min_range*dt, color='green', linestyle='--', label='t final')
 #add horizontal line to show the minimum range
 ax3.axhline(min_range_sep, color='yellow', linestyle='--', label='min range')
 #add label to the line showing the minimum range
-ax3.text(1, min_range_sep+200, f'min range: {min_range_sep:.1f}', fontsize=12, color='yellow')
+ax3.text(1, min_range_sep+200, f'min range: {min_range_sep:.1f} (m)', fontsize=12, color='yellow')
 
 fig2.legend()
 
@@ -128,7 +154,7 @@ ax=fig.add_subplot(111, projection='3d')
 
 Mline, = ax.plot([],[],[], label='Missile')
 Tline, = ax.plot([],[],[], label='Target')
-ax.set(xlim=(-5000, 1000), ylim=(-5000, 5000), zlim=(-1000, 1000))
+ax.set(xlim=(-5000, 1000), ylim=(0, 5000), zlim=(9000, 11000))
 
 def init():
     Mline.set_data([], [])
@@ -144,6 +170,6 @@ def animate(i,Mline,Tline):
     Tline.set_3d_properties(Tlist[:i,2])
     return Mline, Tline
 
-anim=animation.FuncAnimation(fig, animate, init_func=init, frames=len(Tlist), fargs=(Mline,Tline), interval=1, blit=True)
+anim=animation.FuncAnimation(fig, animate, init_func=init, frames=len(Tlist), fargs=(Mline,Tline), interval=0.25, blit=True)
 
 plt.show()
