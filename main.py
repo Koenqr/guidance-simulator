@@ -11,10 +11,10 @@ def norm(x):
 # Setting initial conditions
 dt = 0.01  # time step
 tmax = 30  # simulation time
-glim = 10  # maximum acceleration
+glim = 50  # maximum acceleration
 
 T = np.array([0, 0, 0])  # target position
-M = np.array([-10000, 0, 0])  # missile position
+M = np.array([-5000, 0, 0])  # missile position
 
 Vt = np.array([0, 300, 0])  # target velocity
 Vm = np.array([600, 0, 0])  # missile velocity
@@ -83,6 +83,7 @@ Tlist = np.array(Tlist)
 Mlist = np.array(Mlist)
 #find index min range of T-M
 min_range = np.argmin(la.norm(Tlist-Mlist, axis=1))
+min_range_sep = la.norm(Tlist[min_range]-Mlist[min_range])
 
 ax.plot(Tlist[:, 0], Tlist[:, 1], Tlist[:, 2], label='Target')
 ax.plot(Mlist[:, 0], Mlist[:, 1], Mlist[:, 2], label='Missile')
@@ -95,7 +96,10 @@ ax.legend()
 fig2 = plt.figure()
 ax2 = fig2.add_subplot() #dual axis plot TGO and ZEM
 
-ax2.plot(np.arange(0, tmax, dt), TGOlist, label='TGO', color='blue')
+ax2.plot(np.arange(0, tmax, dt), TGOlist, label='TGO-est', color='blue')
+#actual tgo (line with -45 deg slope until the missile is closest to the target)
+ax2.plot(np.arange(0, min_range*dt, dt), np.arange(min_range*dt, 0, -dt), label='TGO-actual', color='cyan')
+
 ax2.set_ylabel('TGO (seconds)')
 ax2.set_xlabel('Time (seconds)')
 
@@ -105,30 +109,41 @@ ax3.set_ylabel('ZEM (meters)')
 
 #add  vertical line to show the time when the missile is closest to the target
 ax2.axvline(min_range*dt, color='green', linestyle='--', label='t final')
+#add horizontal line to show the minimum range
+ax3.axhline(min_range_sep, color='yellow', linestyle='--', label='min range')
+#add label to the line showing the minimum range
+ax3.text(1, min_range_sep+200, f'min range: {min_range_sep:.1f}', fontsize=12, color='yellow')
 
 fig2.legend()
 
 plt.show()
 
-#animation of 3D plot
-import matplotlib.animation as ani
 
-fig4 = plt.figure()
-ax4 = fig4.add_subplot(111, projection='3d')
 
-def update_lines(num, Tlist, Mlist, line1, line2):
-    line1.set_data(Tlist[:num, 0], Tlist[:num, 1])
-    line1.set_3d_properties(Tlist[:num, 2])
-    line2.set_data(Mlist[:num, 0], Mlist[:num, 1])
-    line2.set_3d_properties(Mlist[:num, 2])
-    return line1, line2
+#make animation of the 3d engagement
+import matplotlib.animation as animation
 
-line1, = ax4.plot([], [], [], label='Target')
+fig=plt.figure()
+ax=fig.add_subplot(111, projection='3d')
 
-line2, = ax4.plot([], [], [], label='Missile')
+Mline, = ax.plot([],[],[], label='Missile')
+Tline, = ax.plot([],[],[], label='Target')
+ax.set(xlim=(-5000, 1000), ylim=(-5000, 5000), zlim=(-1000, 1000))
 
-ax4.legend()
+def init():
+    Mline.set_data([], [])
+    Mline.set_3d_properties([])
+    Tline.set_data([], [])
+    Tline.set_3d_properties([])
+    return Mline, Tline
 
-ani3d = ani.FuncAnimation(fig4, update_lines, len(Tlist), fargs=(Tlist, Mlist, line1, line2), interval=1000*dt, blit=True)
+def animate(i,Mline,Tline):
+    Mline.set_data(Mlist[:i,0], Mlist[:i,1])
+    Mline.set_3d_properties(Mlist[:i,2])
+    Tline.set_data(Tlist[:i,0], Tlist[:i,1])
+    Tline.set_3d_properties(Tlist[:i,2])
+    return Mline, Tline
+
+anim=animation.FuncAnimation(fig, animate, init_func=init, frames=len(Tlist), fargs=(Mline,Tline), interval=1, blit=True)
 
 plt.show()
